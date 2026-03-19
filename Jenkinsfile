@@ -78,62 +78,65 @@ pipeline {
         }
 
         stage('Generate Summary (FAST P90)') {
-            steps {
-                script {
+    steps {
+        script {
 
-                    def raw = powershell(
-                        returnStdout: true,
-                        script: '''
-                        if (!(Test-Path "result.jtl")) {
-                            Write-Output "TOTAL=0"
-                            Write-Output "P90=0"
-                            Write-Output "ERRORPCT=0"
-                            exit
-                        }
-
-                        # Read only last 10000 records (avoid memory issue)
-                        $lines = Get-Content "result.jtl" -Tail 10000
-                        $data = $lines | ConvertFrom-Csv
-
-                        if ($data.Count -eq 0) {
-                            Write-Output "TOTAL=0"
-                            Write-Output "P90=0"
-                            Write-Output "ERRORPCT=0"
-                            exit
-                        }
-
-                        $total = $data.Count
-                        $fail = ($data | Where-Object {$_.success -ne "true"}).Count
-                        $errorPct = [math]::Round(($fail/$total)*100,2)
-
-                        $sorted = $data | Sort-Object {[int]$_.elapsed}
-                        $index = [math]::Ceiling(0.9 * $sorted.Count) - 1
-                        $p90 = $sorted[$index].elapsed
-
-                        Write-Output "TOTAL=$total"
-                        Write-Output "P90=$p90"
-                        Write-Output "ERRORPCT=$errorPct"
-                        '''
-                    ).trim()
-
-                    echo raw
-
-                    def lines = raw.split("\\r?\\n")
-
-                    env.TOTAL = lines.find { it.startsWith("TOTAL=") }?.split("=")[1]
-                    env.P90 = lines.find { it.startsWith("P90=") }?.split("=")[1]
-                    env.ERRORPCT = lines.find { it.startsWith("ERRORPCT=") }?.split("=")[1]
-
-                    // SLA
-                    env.SLA_STATUS = (env.P90.toFloat() <= 1500 && env.ERRORPCT.toFloat() <= 1) ? "PASS" : "FAIL"
-
-                    if (env.SLA_STATUS == "FAIL") {
-                        error "❌ SLA Failed"
-                    }
+            def raw = powershell(
+                returnStdout: true,
+                script: '''
+                if (!(Test-Path "result.jtl")) {
+                    Write-Output "TOTAL=0"
+                    Write-Output "P90=0"
+                    Write-Output "ERRORPCT=0"
+                    exit
                 }
+
+                # Read file safely
+                $lines = Get-Content "result.jtl"
+
+                # Remove duplicate headers if any
+                $clean = $lines | Select-Object -Unique
+
+                # Take last 10000 lines only
+                $data = $clean | Select-Object -Last 10000 | ConvertFrom-Csv
+
+                if ($data.Count -eq 0) {
+                    Write-Output "TOTAL=0"
+                    Write-Output "P90=0"
+                    Write-Output "ERRORPCT=0"
+                    exit
+                }
+
+                $total = $data.Count
+                $fail = ($data | Where-Object {$_.success -ne "true"}).Count
+                $errorPct = [math]::Round(($fail/$total)*100,2)
+
+                $sorted = $data | Sort-Object {[int]$_.elapsed}
+                $index = [math]::Ceiling(0.9 * $sorted.Count) - 1
+                $p90 = $sorted[$index].elapsed
+
+                Write-Output "TOTAL=$total"
+                Write-Output "P90=$p90"
+                Write-Output "ERRORPCT=$errorPct"
+                '''
+            ).trim()
+
+            echo raw
+
+            def lines = raw.split("\\r?\\n")
+
+            env.TOTAL = lines.find { it.startsWith("TOTAL=") }?.split("=")[1]
+            env.P90 = lines.find { it.startsWith("P90=") }?.split("=")[1]
+            env.ERRORPCT = lines.find { it.startsWith("ERRORPCT=") }?.split("=")[1]
+
+            env.SLA_STATUS = (env.P90.toFloat() <= 1500 && env.ERRORPCT.toFloat() <= 1) ? "PASS" : "FAIL"
+
+            if (env.SLA_STATUS == "FAIL") {
+                error "❌ SLA Failed"
             }
         }
-
+    }
+}
         stage('Publish Report') {
             steps {
                 publishHTML([
