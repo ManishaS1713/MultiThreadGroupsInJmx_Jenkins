@@ -6,16 +6,13 @@ pipeline {
         choice(name: 'TEST_TYPE', choices: ['LOAD', 'STRESS', 'SPIKE'], description: 'Test Type')
         choice(name: 'ENV', choices: ['DEV', 'QA', 'PROD'], description: 'Environment')
 
-        string(name: 'THREAD_GROUPS', defaultValue: 'FishFlow', description: 'FishFlow,DogFlow,CatFlow,BirdsFlow,ReptilesFlow')
+        string(name: 'THREAD_GROUPS', defaultValue: 'FishFlow', description: 'Comma separated: FishFlow,CatFlow')
 
-        string(name: 'FISH_THREADS', defaultValue: '', description: 'Optional')
-        string(name: 'DOG_THREADS', defaultValue: '', description: 'Optional')
-        string(name: 'CAT_THREADS', defaultValue: '', description: 'Optional')
-        string(name: 'BIRDS_THREADS', defaultValue: '', description: 'Optional')
-        string(name: 'REPTILES_THREADS', defaultValue: '', description: 'Optional')
+        string(name: 'FISH_THREADS', defaultValue: '', description: 'Threads for FishFlow')
+        string(name: 'CAT_THREADS', defaultValue: '', description: 'Threads for CatFlow')
 
-        string(name: 'RAMPUP', defaultValue: '2', description: 'Ramp-up')
-        string(name: 'DURATION', defaultValue: '60', description: 'Duration')
+        string(name: 'RAMPUP', defaultValue: '2', description: 'Ramp-up time')
+        string(name: 'DURATION', defaultValue: '60', description: 'Test duration')
     }
 
     environment {
@@ -38,47 +35,19 @@ pipeline {
             }
         }
 
-        stage('Build Thread Config') {
+        stage('Prepare Thread Values') {
             steps {
                 script {
 
-                    env.SELECTED_TG = params.THREAD_GROUPS.replaceAll("\\s","")
-                    def selected = env.SELECTED_TG.split(",")
+                    def selected = params.THREAD_GROUPS.replaceAll("\\s","").split(",")
 
-                    def configList = []
+                    // Dynamic assignment
+                    env.FISH = selected.contains("FishFlow") ? (params.FISH_THREADS?.trim() ?: "1") : "0"
+                    env.CAT  = selected.contains("CatFlow")  ? (params.CAT_THREADS?.trim()  ?: "1") : "0"
 
-                    selected.each { tg ->
-
-                        if (tg == "FishFlow") {
-                            def val = params.FISH_THREADS?.trim() ? params.FISH_THREADS : "1"
-                            configList.add("FishFlow:${val}")
-                        }
-
-                        if (tg == "DogFlow") {
-                            def val = params.DOG_THREADS?.trim() ? params.DOG_THREADS : "1"
-                            configList.add("DogFlow:${val}")
-                        }
-
-                        if (tg == "CatFlow") {
-                            def val = params.CAT_THREADS?.trim() ? params.CAT_THREADS : "1"
-                            configList.add("CatFlow:${val}")
-                        }
-
-                        if (tg == "BirdsFlow") {
-                            def val = params.BIRDS_THREADS?.trim() ? params.BIRDS_THREADS : "1"
-                            configList.add("BirdsFlow:${val}")
-                        }
-
-                        if (tg == "ReptilesFlow") {
-                            def val = params.REPTILES_THREADS?.trim() ? params.REPTILES_THREADS : "1"
-                            configList.add("ReptilesFlow:${val}")
-                        }
-                    }
-
-                    env.THREAD_CONFIG = configList.join(",")
-
-                    echo "Selected Flows: ${env.SELECTED_TG}"
-                    echo "Thread Config: ${env.THREAD_CONFIG}"
+                    echo "Selected Flows: ${params.THREAD_GROUPS}"
+                    echo "Fish Threads: ${env.FISH}"
+                    echo "Cat Threads: ${env.CAT}"
                 }
             }
         }
@@ -102,8 +71,8 @@ pipeline {
                 C:\\Jmeter\\apache-jmeter-5.6.3\\bin\\jmeter.bat -n ^
                 -t MultiThreadGroupsInJmx_Jenkins.jmx ^
                 -Jhost=${env.HOST} ^
-                -JthreadGroups=${env.SELECTED_TG} ^
-                -JthreadConfig=${env.THREAD_CONFIG} ^
+                -JFishFlow_threads=${env.FISH} ^
+                -JCatFlow_threads=${env.CAT} ^
                 -Jrampup=${params.RAMPUP} ^
                 -Jduration=${params.DURATION} ^
                 -l MultiThreadGroupsInJmx_Jenkins-result.jtl ^
@@ -126,13 +95,7 @@ pipeline {
                             exit
                         }
 
-                        $lines = Get-Content "MultiThreadGroupsInJmx_Jenkins-result.jtl" -Tail 5000
-
-                        # Remove duplicate headers
-                        $clean = $lines | Select-Object -Unique
-
-                        # Take last 10000 rows
-                        $data = $clean | Select-Object -Last 10000 | ConvertFrom-Csv
+                        $data = Get-Content "MultiThreadGroupsInJmx_Jenkins-result.jtl" | ConvertFrom-Csv
 
                         if ($data.Count -eq 0) {
                             Write-Output "TOTAL=0"
@@ -193,8 +156,9 @@ pipeline {
                         body: """
 <h3>Performance Report</h3>
 
-<b>Flows:</b> ${env.SELECTED_TG} <br>
-<b>Thread Config:</b> ${env.THREAD_CONFIG} <br>
+<b>Flows:</b> ${params.THREAD_GROUPS} <br>
+<b>Fish Threads:</b> ${env.FISH} <br>
+<b>Cat Threads:</b> ${env.CAT} <br>
 
 <b>Total:</b> ${env.TOTAL} <br>
 <b>P90:</b> ${env.P90} ms <br>
