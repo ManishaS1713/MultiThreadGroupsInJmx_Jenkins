@@ -6,13 +6,16 @@ pipeline {
         choice(name: 'TEST_TYPE', choices: ['LOAD', 'STRESS', 'SPIKE'], description: 'Test Type')
         choice(name: 'ENV', choices: ['DEV', 'QA', 'PROD'], description: 'Environment')
 
-        string(name: 'THREAD_GROUPS', defaultValue: 'FishFlow', description: 'Comma separated: FishFlow,CatFlow')
+        string(name: 'THREAD_GROUPS', defaultValue: 'FishFlow', description: 'FishFlow,DogFlow,CatFlow,BirdsFlow,ReptilesFlow')
 
-        string(name: 'FISH_THREADS', defaultValue: '', description: 'Threads for FishFlow')
-        string(name: 'CAT_THREADS', defaultValue: '', description: 'Threads for CatFlow')
+        string(name: 'FISH_THREADS', defaultValue: '', description: 'FishFlow threads')
+        string(name: 'DOG_THREADS', defaultValue: '', description: 'DogFlow threads')
+        string(name: 'CAT_THREADS', defaultValue: '', description: 'CatFlow threads')
+        string(name: 'BIRDS_THREADS', defaultValue: '', description: 'BirdsFlow threads')
+        string(name: 'REPTILES_THREADS', defaultValue: '', description: 'ReptilesFlow threads')
 
-        string(name: 'RAMPUP', defaultValue: '2', description: 'Ramp-up time')
-        string(name: 'DURATION', defaultValue: '60', description: 'Test duration')
+        string(name: 'RAMPUP', defaultValue: '2', description: 'Ramp-up')
+        string(name: 'DURATION', defaultValue: '60', description: 'Duration')
     }
 
     environment {
@@ -41,13 +44,14 @@ pipeline {
 
                     def selected = params.THREAD_GROUPS.replaceAll("\\s","").split(",")
 
-                    // Dynamic assignment
-                    env.FISH = selected.contains("FishFlow") ? (params.FISH_THREADS?.trim() ?: "1") : "0"
-                    env.CAT  = selected.contains("CatFlow")  ? (params.CAT_THREADS?.trim()  ?: "1") : "0"
+                    env.FISH     = selected.contains("FishFlow")     ? (params.FISH_THREADS?.trim()     ?: "1") : "0"
+                    env.DOG      = selected.contains("DogFlow")      ? (params.DOG_THREADS?.trim()      ?: "1") : "0"
+                    env.CAT      = selected.contains("CatFlow")      ? (params.CAT_THREADS?.trim()      ?: "1") : "0"
+                    env.BIRDS    = selected.contains("BirdsFlow")    ? (params.BIRDS_THREADS?.trim()    ?: "1") : "0"
+                    env.REPTILES = selected.contains("ReptilesFlow") ? (params.REPTILES_THREADS?.trim() ?: "1") : "0"
 
                     echo "Selected Flows: ${params.THREAD_GROUPS}"
-                    echo "Fish Threads: ${env.FISH}"
-                    echo "Cat Threads: ${env.CAT}"
+                    echo "Fish: ${env.FISH}, Dog: ${env.DOG}, Cat: ${env.CAT}, Birds: ${env.BIRDS}, Reptiles: ${env.REPTILES}"
                 }
             }
         }
@@ -72,7 +76,10 @@ pipeline {
                 -t MultiThreadGroupsInJmx_Jenkins.jmx ^
                 -Jhost=${env.HOST} ^
                 -JFishFlow_threads=${env.FISH} ^
+                -JDogFlow_threads=${env.DOG} ^
                 -JCatFlow_threads=${env.CAT} ^
+                -JBirdsFlow_threads=${env.BIRDS} ^
+                -JReptilesFlow_threads=${env.REPTILES} ^
                 -Jrampup=${params.RAMPUP} ^
                 -Jduration=${params.DURATION} ^
                 -l MultiThreadGroupsInJmx_Jenkins-result.jtl ^
@@ -157,8 +164,12 @@ pipeline {
 <h3>Performance Report</h3>
 
 <b>Flows:</b> ${params.THREAD_GROUPS} <br>
-<b>Fish Threads:</b> ${env.FISH} <br>
-<b>Cat Threads:</b> ${env.CAT} <br>
+
+<b>Fish:</b> ${env.FISH} <br>
+<b>Dog:</b> ${env.DOG} <br>
+<b>Cat:</b> ${env.CAT} <br>
+<b>Birds:</b> ${env.BIRDS} <br>
+<b>Reptiles:</b> ${env.REPTILES} <br>
 
 <b>Total:</b> ${env.TOTAL} <br>
 <b>P90:</b> ${env.P90} ms <br>
