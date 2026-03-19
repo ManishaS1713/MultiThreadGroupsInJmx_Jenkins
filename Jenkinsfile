@@ -138,6 +138,7 @@ pipeline {
             steps {
                 publishHTML([
                     allowMissing: true,
+                    alwaysLinkToLastBuild: true,
                     reportDir: 'report',
                     reportFiles: 'index.html',
                     reportName: 'JMeter Report',
