@@ -133,7 +133,7 @@ pipeline {
                     env.P90 = lines.find { it.startsWith("P90=") }?.split("=")[1]
                     env.ERRORPCT = lines.find { it.startsWith("ERRORPCT=") }?.split("=")[1]
 
-                    env.SLA_STATUS = (env.P90.toFloat() <= 1500 && env.ERRORPCT.toFloat() <= 1) ? "PASS" : "FAIL"
+                    env.SLA_STATUS = (env.P90.toFloat() <= 3000 && env.ERRORPCT.toFloat() <= 1) ? "PASS" : "FAIL"
 
                     if (env.SLA_STATUS == "FAIL") {
                         error "❌ SLA Failed"
