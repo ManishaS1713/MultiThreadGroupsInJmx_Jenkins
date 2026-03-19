@@ -126,7 +126,7 @@ pipeline {
                             exit
                         }
 
-                        $lines = Get-Content "MultiThreadGroupsInJmx_Jenkins-result.jtl"
+                        $lines = Get-Content "MultiThreadGroupsInJmx_Jenkins-result.jtl" -Tail 5000
 
                         # Remove duplicate headers
                         $clean = $lines | Select-Object -Unique
