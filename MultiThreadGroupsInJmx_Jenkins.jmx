@@ -76,9 +76,9 @@
       </CSVDataSet>
       <hashTree/>
       <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="FishFlow">
-        <stringProp name="TestPlan.comments">${__groovy( def tg=&quot;FishFlow&quot; def groups=props.get(&quot;threadGroups&quot;) def config=props.get(&quot;threadConfig&quot;)  if(groups!=null &amp;&amp; groups.contains(tg)){     def arr=config.split(&quot;,&quot;)     for(item in arr){         if(item.startsWith(tg+&quot;:&quot;)){             return item.split(&quot;:&quot;)[1]         }     }     return &quot;1&quot; } return &quot;0&quot; )}
+        <stringProp name="TestPlan.comments">${__groovy(def tg=&quot;FishFlow&quot;; def groups=props.get(&quot;threadGroups&quot;); def config=props.get(&quot;threadConfig&quot;); if(groups!=null &amp;&amp; groups.contains(tg)){ def arr=config.split(&quot;,&quot;); for(item in arr){ if(item.startsWith(tg+&quot;:&quot;)){ return item.split(&quot;:&quot;)[1]; } } return &quot;1&quot;; } return &quot;0&quot;; )}
 ${__P(FishFlow_threads,1)}</stringProp>
-        <stringProp name="ThreadGroup.num_threads">${__groovy(def tg=&quot;FishFlow&quot;; def groups=props.get(&quot;threadGroups&quot;); def config=props.get(&quot;threadConfig&quot;); if(groups!=null &amp;&amp; groups.contains(tg)){ def arr=config.split(&quot;,&quot;); for(item in arr){ if(item.startsWith(tg+&quot;:&quot;)){ return item.split(&quot;:&quot;)[1]; } } return &quot;1&quot;; } return &quot;0&quot;; )}</stringProp>
+        <stringProp name="ThreadGroup.num_threads">${__P(FishFlow_threads,1)}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">1${__P(rampup,1)}</stringProp>
         <stringProp name="ThreadGroup.duration">${__P(duration,60)}</stringProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">false</boolProp>
@@ -1431,7 +1431,7 @@ ${__P(FishFlow_threads,1)}</stringProp>
         </ConstantTimer>
         <hashTree/>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="DogFlow">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="DogFlow" enabled="false">
         <stringProp name="ThreadGroup.num_threads">${__groovy(def tg=&quot;DogFlow&quot;; def groups=props.get(&quot;threadGroups&quot;); def config=props.get(&quot;threadConfig&quot;); if(groups!=null &amp;&amp; groups.contains(tg)){ def arr=config.split(&quot;,&quot;); for(item in arr){ if(item.startsWith(tg+&quot;:&quot;)){ return item.split(&quot;:&quot;)[1]; } } return &quot;1&quot;; } return &quot;0&quot;; )}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">${__P(rampup,1)}</stringProp>
         <stringProp name="ThreadGroup.duration">${__P(duration,60)}</stringProp>
@@ -2785,7 +2785,7 @@ ${__P(FishFlow_threads,1)}</stringProp>
         </ConstantTimer>
         <hashTree/>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="CatFlow">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="CatFlow" enabled="false">
         <stringProp name="ThreadGroup.num_threads">${__groovy(def tg=&quot;CatFlow&quot;; def groups=props.get(&quot;threadGroups&quot;); def config=props.get(&quot;threadConfig&quot;); if(groups!=null &amp;&amp; groups.contains(tg)){ def arr=config.split(&quot;,&quot;); for(item in arr){ if(item.startsWith(tg+&quot;:&quot;)){ return item.split(&quot;:&quot;)[1]; } } return &quot;1&quot;; } return &quot;0&quot;; )}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">${__P(rampup,1)}</stringProp>
         <stringProp name="ThreadGroup.duration">${__P(duration,60)}</stringProp>
@@ -4139,7 +4139,7 @@ ${__P(FishFlow_threads,1)}</stringProp>
         </ConstantTimer>
         <hashTree/>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="ReptilesFlow">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="ReptilesFlow" enabled="false">
         <stringProp name="ThreadGroup.num_threads">${__groovy(def tg=&quot;ReptilesFlow&quot;; def groups=props.get(&quot;threadGroups&quot;); def config=props.get(&quot;threadConfig&quot;); if(groups!=null &amp;&amp; groups.contains(tg)){ def arr=config.split(&quot;,&quot;); for(item in arr){ if(item.startsWith(tg+&quot;:&quot;)){ return item.split(&quot;:&quot;)[1]; } } return &quot;1&quot;; } return &quot;0&quot;; )}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">${__P(rampup,1)}</stringProp>
         <stringProp name="ThreadGroup.duration">${__P(duration,60)}</stringProp>
@@ -5493,7 +5493,7 @@ ${__P(FishFlow_threads,1)}</stringProp>
         </ConstantTimer>
         <hashTree/>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="BirdsFlow">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="BirdsFlow" enabled="false">
         <stringProp name="ThreadGroup.num_threads">${__groovy(def tg=&quot;BirdsFlow&quot;; def groups=props.get(&quot;threadGroups&quot;); def config=props.get(&quot;threadConfig&quot;); if(groups!=null &amp;&amp; groups.contains(tg)){ def arr=config.split(&quot;,&quot;); for(item in arr){ if(item.startsWith(tg+&quot;:&quot;)){ return item.split(&quot;:&quot;)[1]; } } return &quot;1&quot;; } return &quot;0&quot;; )}</stringProp>
         <stringProp name="ThreadGroup.ramp_time">${__P(rampup,1)}</stringProp>
         <stringProp name="ThreadGroup.duration">${__P(duration,60)}</stringProp>
