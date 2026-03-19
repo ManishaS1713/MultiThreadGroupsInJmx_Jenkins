@@ -8,7 +8,6 @@ pipeline {
 
         string(name: 'THREAD_GROUPS', defaultValue: 'FishFlow', description: 'FishFlow,DogFlow,CatFlow')
 
-        // NEW (runtime control)
         string(name: 'THREAD_CONFIG', defaultValue: 'FishFlow:5', description: 'FishFlow:10,DogFlow:20')
         string(name: 'RAMPUP', defaultValue: '', description: 'Optional override ramp-up')
         string(name: 'DURATION', defaultValue: '', description: 'Optional override duration')
@@ -70,7 +69,7 @@ pipeline {
         stage('Set Test Type Configuration') {
             steps {
                 script {
-                    // Default values from TEST_TYPE
+
                     if (params.TEST_TYPE == 'LOAD') {
                         env.RAMPUP_VAL = "2"
                         env.DURATION_VAL = "60"
@@ -82,7 +81,6 @@ pipeline {
                         env.DURATION_VAL = "60"
                     }
 
-                    // 🔥 Override if user gives runtime values
                     if (params.RAMPUP?.trim()) {
                         env.RAMPUP_VAL = params.RAMPUP
                     }
@@ -116,7 +114,7 @@ pipeline {
             }
         }
 
-        stage('Generate Summary') {
+        stage('Generate Summary (P90)') {
             steps {
                 script {
 
@@ -129,7 +127,7 @@ pipeline {
                             Write-Output "TOTAL=0"
                             Write-Output "SUCCESS=0"
                             Write-Output "FAIL=0"
-                            Write-Output "AVG=0"
+                            Write-Output "P90=0"
                             Write-Output "TPS=0"
                             Write-Output "ERRORPCT=0"
                             exit
@@ -138,8 +136,15 @@ pipeline {
                         $total = $data.Count
                         $success = ($data | Where-Object {$_.success -eq "true"}).Count
                         $fail = $total - $success
-                        $avg = [math]::Round(($data | Measure-Object -Property elapsed -Average).Average,2)
 
+                        # Sort response times
+                        $sorted = $data | Sort-Object {[int]$_.elapsed}
+
+                        # P90 calculation
+                        $index = [math]::Ceiling(0.9 * $sorted.Count) - 1
+                        $p90 = $sorted[$index].elapsed
+
+                        # TPS
                         $start = $data[0].timeStamp
                         $end = $data[-1].timeStamp
                         $duration = ($end - $start)/1000
@@ -151,7 +156,7 @@ pipeline {
                         Write-Output "TOTAL=$total"
                         Write-Output "SUCCESS=$success"
                         Write-Output "FAIL=$fail"
-                        Write-Output "AVG=$avg"
+                        Write-Output "P90=$p90"
                         Write-Output "TPS=$tps"
                         Write-Output "ERRORPCT=$errorPct"
                         '''
@@ -164,13 +169,24 @@ pipeline {
                     env.TOTAL = lines.find { it.startsWith("TOTAL=") }?.split("=")[1]
                     env.SUCCESS = lines.find { it.startsWith("SUCCESS=") }?.split("=")[1]
                     env.FAIL = lines.find { it.startsWith("FAIL=") }?.split("=")[1]
-                    env.AVG = lines.find { it.startsWith("AVG=") }?.split("=")[1]
+                    env.P90 = lines.find { it.startsWith("P90=") }?.split("=")[1]
                     env.TPS = lines.find { it.startsWith("TPS=") }?.split("=")[1]
                     env.ERRORPCT = lines.find { it.startsWith("ERRORPCT=") }?.split("=")[1]
 
-                    env.SLA_STATUS = "PASS"
-                    if ((env.AVG ?: "0").toFloat() > 1000 || (env.ERRORPCT ?: "0").toFloat() > 1) {
-                        env.SLA_STATUS = "FAIL"
+                    // 🔥 SLA based on P90
+                    if (params.TEST_TYPE == 'LOAD') {
+                        env.SLA_STATUS = (env.P90.toFloat() <= 1500 && env.ERRORPCT.toFloat() <= 1) ? "PASS" : "FAIL"
+                    }
+                    else if (params.TEST_TYPE == 'STRESS') {
+                        env.SLA_STATUS = (env.P90.toFloat() <= 3000 && env.ERRORPCT.toFloat() <= 5) ? "PASS" : "FAIL"
+                    }
+                    else {
+                        env.SLA_STATUS = (env.P90.toFloat() <= 5000) ? "PASS" : "FAIL"
+                    }
+
+                    // ❌ Fail build if SLA fails
+                    if (env.SLA_STATUS == "FAIL") {
+                        error "SLA Failed! Check performance report."
                     }
                 }
             }
@@ -205,7 +221,7 @@ pipeline {
 <b>Total Requests:</b> ${env.TOTAL} <br>
 <b>Success:</b> ${env.SUCCESS} <br>
 <b>Failures:</b> ${env.FAIL} <br>
-<b>Avg Response Time:</b> ${env.AVG} ms <br>
+<b>P90 Response Time:</b> ${env.P90} ms <br>
 <b>Throughput:</b> ${env.TPS} req/sec <br>
 <b>Error %:</b> ${env.ERRORPCT} % <br>
 
