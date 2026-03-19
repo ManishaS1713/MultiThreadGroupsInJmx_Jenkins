@@ -8,9 +8,11 @@ pipeline {
 
         string(name: 'THREAD_GROUPS', defaultValue: 'FishFlow', description: 'FishFlow,DogFlow,CatFlow')
 
-        string(name: 'THREAD_CONFIG', defaultValue: 'FishFlow:5', description: 'FishFlow:10,DogFlow:20')
-        string(name: 'RAMPUP', defaultValue: '', description: 'Optional override ramp-up')
-        string(name: 'DURATION', defaultValue: '', description: 'Optional override duration')
+        string(name: 'FISH_THREADS', defaultValue: '5', description: 'FishFlow threads')
+        string(name: 'CAT_THREADS', defaultValue: '5', description: 'CatFlow threads')
+
+        string(name: 'RAMPUP', defaultValue: '2', description: 'Ramp-up')
+        string(name: 'DURATION', defaultValue: '60', description: 'Duration')
     }
 
     environment {
@@ -36,15 +38,11 @@ pipeline {
         stage('Validate Input') {
             steps {
                 script {
-                    if (!params.THREAD_GROUPS?.trim()) {
-                        error "THREAD_GROUPS cannot be empty!"
-                    }
-
                     env.SELECTED_TG = params.THREAD_GROUPS.replaceAll("\\s","")
-                    env.THREAD_MAP = params.THREAD_CONFIG.replaceAll("\\s","")
 
                     echo "Thread Groups: ${env.SELECTED_TG}"
-                    echo "Thread Config: ${env.THREAD_MAP}"
+                    echo "Fish Threads: ${params.FISH_THREADS}"
+                    echo "Cat Threads: ${params.CAT_THREADS}"
                 }
             }
         }
@@ -52,45 +50,9 @@ pipeline {
         stage('Set Environment URL') {
             steps {
                 script {
-                    if (params.ENV == 'DEV') {
-                        env.HOST = "petstore.octoperf.com"
-                    } else if (params.ENV == 'QA') {
-                        env.HOST = "petstore.octoperf.com"
-                    } else {
-                        env.HOST = "petstore.octoperf.com"
-                    }
-
+                    env.HOST = "petstore.octoperf.com"
                     echo "Environment: ${params.ENV}"
                     echo "Host: ${env.HOST}"
-                }
-            }
-        }
-
-        stage('Set Test Type Configuration') {
-            steps {
-                script {
-
-                    if (params.TEST_TYPE == 'LOAD') {
-                        env.RAMPUP_VAL = "2"
-                        env.DURATION_VAL = "60"
-                    } else if (params.TEST_TYPE == 'STRESS') {
-                        env.RAMPUP_VAL = "5"
-                        env.DURATION_VAL = "60"
-                    } else {
-                        env.RAMPUP_VAL = "1"
-                        env.DURATION_VAL = "60"
-                    }
-
-                    if (params.RAMPUP?.trim()) {
-                        env.RAMPUP_VAL = params.RAMPUP
-                    }
-
-                    if (params.DURATION?.trim()) {
-                        env.DURATION_VAL = params.DURATION
-                    }
-
-                    echo "Final Ramp-up: ${env.RAMPUP_VAL}"
-                    echo "Final Duration: ${env.DURATION_VAL}"
                 }
             }
         }
@@ -98,66 +60,58 @@ pipeline {
         stage('Run Performance Test') {
             steps {
                 bat """
-                IF EXIST MultiThreadGroupsInJmx_Jenkins-result.jtl del MultiThreadGroupsInJmx_Jenkins-result.jtl
-                IF EXIST MultiThreadGroupsInJmx_Jenkins-report rmdir /s /q MultiThreadGroupsInJmx_Jenkins-report
+                IF EXIST result.jtl del result.jtl
+                IF EXIST report rmdir /s /q report
 
                 C:\\Jmeter\\apache-jmeter-5.6.3\\bin\\jmeter.bat -n ^
                 -t MultiThreadGroupsInJmx_Jenkins.jmx ^
                 -Jhost=${env.HOST} ^
                 -JthreadGroups=${env.SELECTED_TG} ^
-                -JthreadConfig=${env.THREAD_MAP} ^
-                -Jrampup=${env.RAMPUP_VAL} ^
-                -Jduration=${env.DURATION_VAL} ^
-                -l MultiThreadGroupsInJmx_Jenkins-result.jtl ^
-                -e -o MultiThreadGroupsInJmx_Jenkins-report
+                -JFishFlow_threads=${params.FISH_THREADS} ^
+                -JCatFlow_threads=${params.CAT_THREADS} ^
+                -Jrampup=${params.RAMPUP} ^
+                -Jduration=${params.DURATION} ^
+                -l result.jtl ^
+                -e -o report
                 """
             }
         }
 
-        stage('Generate Summary (P90)') {
+        stage('Generate Summary (FAST P90)') {
             steps {
                 script {
 
                     def raw = powershell(
                         returnStdout: true,
                         script: '''
-                        $data = Import-Csv "MultiThreadGroupsInJmx_Jenkins-result.jtl"
+                        if (!(Test-Path "result.jtl")) {
+                            Write-Output "TOTAL=0"
+                            Write-Output "P90=0"
+                            Write-Output "ERRORPCT=0"
+                            exit
+                        }
+
+                        # Read only last 10000 records (avoid memory issue)
+                        $lines = Get-Content "result.jtl" -Tail 10000
+                        $data = $lines | ConvertFrom-Csv
 
                         if ($data.Count -eq 0) {
                             Write-Output "TOTAL=0"
-                            Write-Output "SUCCESS=0"
-                            Write-Output "FAIL=0"
                             Write-Output "P90=0"
-                            Write-Output "TPS=0"
                             Write-Output "ERRORPCT=0"
                             exit
                         }
 
                         $total = $data.Count
-                        $success = ($data | Where-Object {$_.success -eq "true"}).Count
-                        $fail = $total - $success
+                        $fail = ($data | Where-Object {$_.success -ne "true"}).Count
+                        $errorPct = [math]::Round(($fail/$total)*100,2)
 
-                        # Sort response times
                         $sorted = $data | Sort-Object {[int]$_.elapsed}
-
-                        # P90 calculation
                         $index = [math]::Ceiling(0.9 * $sorted.Count) - 1
                         $p90 = $sorted[$index].elapsed
 
-                        # TPS
-                        $start = $data[0].timeStamp
-                        $end = $data[-1].timeStamp
-                        $duration = ($end - $start)/1000
-                        if ($duration -eq 0) { $duration = 1 }
-
-                        $tps = [math]::Round($total / $duration,2)
-                        $errorPct = [math]::Round(($fail/$total)*100,2)
-
                         Write-Output "TOTAL=$total"
-                        Write-Output "SUCCESS=$success"
-                        Write-Output "FAIL=$fail"
                         Write-Output "P90=$p90"
-                        Write-Output "TPS=$tps"
                         Write-Output "ERRORPCT=$errorPct"
                         '''
                     ).trim()
@@ -167,26 +121,14 @@ pipeline {
                     def lines = raw.split("\\r?\\n")
 
                     env.TOTAL = lines.find { it.startsWith("TOTAL=") }?.split("=")[1]
-                    env.SUCCESS = lines.find { it.startsWith("SUCCESS=") }?.split("=")[1]
-                    env.FAIL = lines.find { it.startsWith("FAIL=") }?.split("=")[1]
                     env.P90 = lines.find { it.startsWith("P90=") }?.split("=")[1]
-                    env.TPS = lines.find { it.startsWith("TPS=") }?.split("=")[1]
                     env.ERRORPCT = lines.find { it.startsWith("ERRORPCT=") }?.split("=")[1]
 
-                    // 🔥 SLA based on P90
-                    if (params.TEST_TYPE == 'LOAD') {
-                        env.SLA_STATUS = (env.P90.toFloat() <= 1500 && env.ERRORPCT.toFloat() <= 1) ? "PASS" : "FAIL"
-                    }
-                    else if (params.TEST_TYPE == 'STRESS') {
-                        env.SLA_STATUS = (env.P90.toFloat() <= 3000 && env.ERRORPCT.toFloat() <= 5) ? "PASS" : "FAIL"
-                    }
-                    else {
-                        env.SLA_STATUS = (env.P90.toFloat() <= 5000) ? "PASS" : "FAIL"
-                    }
+                    // SLA
+                    env.SLA_STATUS = (env.P90.toFloat() <= 1500 && env.ERRORPCT.toFloat() <= 1) ? "PASS" : "FAIL"
 
-                    // ❌ Fail build if SLA fails
                     if (env.SLA_STATUS == "FAIL") {
-                        error "SLA Failed! Check performance report."
+                        error "❌ SLA Failed"
                     }
                 }
             }
@@ -196,11 +138,10 @@ pipeline {
             steps {
                 publishHTML([
                     allowMissing: true,
-                    reportDir: 'MultiThreadGroupsInJmx_Jenkins-report',
+                    reportDir: 'report',
                     reportFiles: 'index.html',
                     reportName: 'JMeter Report',
-                    keepAll: true,
-                    alwaysLinkToLastBuild: true
+                    keepAll: true
                 ])
             }
         }
@@ -209,26 +150,18 @@ pipeline {
             steps {
                 script {
                     emailext(
-                        subject: "Performance Test Result - ${env.SLA_STATUS}",
+                        subject: "Performance Test - ${env.SLA_STATUS}",
                         body: """
-<h2>Performance Test Report (${params.ENV})</h2>
+<h3>Performance Report</h3>
 
-<b>Thread Groups:</b> ${env.SELECTED_TG} <br>
-<b>Thread Config:</b> ${env.THREAD_MAP} <br>
-<b>Ramp-up:</b> ${env.RAMPUP_VAL} <br>
-<b>Duration:</b> ${env.DURATION_VAL} <br>
+Total: ${env.TOTAL} <br>
+P90: ${env.P90} ms <br>
+Error %: ${env.ERRORPCT}% <br>
 
-<b>Total Requests:</b> ${env.TOTAL} <br>
-<b>Success:</b> ${env.SUCCESS} <br>
-<b>Failures:</b> ${env.FAIL} <br>
-<b>P90 Response Time:</b> ${env.P90} ms <br>
-<b>Throughput:</b> ${env.TPS} req/sec <br>
-<b>Error %:</b> ${env.ERRORPCT} % <br>
-
-<br><b>SLA Status:</b> <span style="color:${env.SLA_STATUS == 'PASS' ? 'green' : 'red'}">${env.SLA_STATUS}</span>
+<b>Status:</b> ${env.SLA_STATUS}
 
 <br><br>
-<a href="${BUILD_URL}">👉 View Full Report</a>
+<a href="${BUILD_URL}">View Report</a>
 """,
                         to: 'manishas@ivavsys.com',
                         mimeType: 'text/html'
