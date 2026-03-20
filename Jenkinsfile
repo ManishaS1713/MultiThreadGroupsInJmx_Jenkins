@@ -180,7 +180,7 @@ pipeline {
 <br><br>
 <a href="${BUILD_URL}">View Report</a>
 """,
-                        to: 'manishas@ivavsys.com',
+                        to: 'manishas@ivavsys.com,nikhil@ivavsys.com,rutuja@ivavsys.com,bhavana@ivavsys.com,geeta@ivavsys.com',
                         mimeType: 'text/html'
                     )
                 }
